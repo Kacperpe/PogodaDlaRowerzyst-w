@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { MapPanel } from "@/components/map-panel";
 import { parseRouteFile } from "@/lib/geojson";
+import { generateRouteIcs } from "@/lib/ics";
 import type { RouteSegment } from "@/types/route-segment";
 import type { WeatherPointForecast } from "@/types/weather-point-forecast";
 
@@ -61,6 +62,18 @@ export default function Home() {
     // computeRouteForecast jest świeże przez closure każdego renderu — pominięte celowo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [segments, routeStartAt]);
+
+  function downloadCalendar() {
+    if (forecastRows.length === 0) return;
+    const ics = generateRouteIcs(forecastRows, routeStartAt);
+    const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "trasa-pogoda.ics";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   function toggleTheme() {
     setThemeMode((prev) => {
@@ -284,9 +297,20 @@ export default function Home() {
 
             {(forecastRows.length > 0 || forecastLoading) ? (
               <div className={`md:col-span-2 rounded-lg border ${isDark ? "border-slate-700" : "border-slate-300"}`}>
-                <div className={`px-2 py-1.5 text-xs font-semibold ${isDark ? "bg-slate-800/80 text-slate-200" : "bg-slate-200 text-slate-800"}`}>
-                  Prognoza pogody na trasie
-                  {forecastLoading && <span className="ml-2 font-normal opacity-60">liczę...</span>}
+                <div className={`flex items-center justify-between gap-2 px-2 py-1.5 text-xs font-semibold ${isDark ? "bg-slate-800/80 text-slate-200" : "bg-slate-200 text-slate-800"}`}>
+                  <span>
+                    Prognoza pogody na trasie
+                    {forecastLoading && <span className="ml-2 font-normal opacity-60">liczę...</span>}
+                  </span>
+                  {forecastRows.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={downloadCalendar}
+                      className={`flex items-center gap-1 rounded px-2 py-1 text-xs font-semibold transition-colors ${isDark ? "bg-cyan-500/15 text-cyan-300 hover:bg-cyan-500/25" : "bg-cyan-100 text-cyan-800 hover:bg-cyan-200"}`}
+                    >
+                      📅 Dodaj do kalendarza
+                    </button>
+                  )}
                 </div>
                 <div className="overflow-y-auto" style={{ maxHeight: 220 }}>
                   <table className="min-w-full text-xs">

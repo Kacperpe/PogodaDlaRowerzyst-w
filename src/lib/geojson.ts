@@ -17,12 +17,14 @@ function haversineKm(a: Coordinates, b: Coordinates) {
 function toSegments(points: Coordinates[], averageSpeedKmh: number) {
   const segments: RouteSegment[] = [];
   let totalMinutes = 0;
+
   for (let i = 0; i < points.length - 1; i += 1) {
     const from = points[i];
     const to = points[i + 1];
     const distanceKm = Number(haversineKm(from, to).toFixed(2));
     const segmentMinutes = (distanceKm / averageSpeedKmh) * 60;
     totalMinutes += segmentMinutes;
+
     segments.push({
       id: `S-${String(i + 1).padStart(3, "0")}`,
       from,
@@ -31,10 +33,11 @@ function toSegments(points: Coordinates[], averageSpeedKmh: number) {
       etaMinutesFromStart: Math.round(totalMinutes),
     });
   }
+
   return segments;
 }
 
-export function parseRouteGeoJson(raw: string, averageSpeedKmh: number) {
+function parseRouteGeoJson(raw: string, averageSpeedKmh: number) {
   const data = JSON.parse(raw) as
     | {
         type: "FeatureCollection";
@@ -57,6 +60,7 @@ export function parseRouteGeoJson(raw: string, averageSpeedKmh: number) {
       (f: { geometry?: { type?: string; coordinates?: Coordinates[] } }) =>
         f.geometry?.type === "LineString" && Array.isArray(f.geometry.coordinates),
     );
+
     if (line?.geometry?.coordinates) {
       return toSegments(line.geometry.coordinates, averageSpeedKmh);
     }
@@ -65,4 +69,27 @@ export function parseRouteGeoJson(raw: string, averageSpeedKmh: number) {
   throw new Error(
     "Niepoprawny GeoJSON: oczekiwany LineString lub FeatureCollection z LineString.",
   );
+}
+
+function parseRouteGpx(raw: string, averageSpeedKmh: number) {
+  const matches = [...raw.matchAll(/<trkpt[^>]*lat="([^"]+)"[^>]*lon="([^"]+)"[^>]*>/g)];
+  const points: Coordinates[] = matches
+    .map((m) => [Number(m[2]), Number(m[1])] as Coordinates)
+    .filter(([lon, lat]) => Number.isFinite(lon) && Number.isFinite(lat));
+
+  if (points.length < 2) {
+    throw new Error("Niepoprawny GPX: brak punktow trasy (trkpt).");
+  }
+
+  return toSegments(points, averageSpeedKmh);
+}
+
+export function parseRouteFile(raw: string, filename: string, averageSpeedKmh: number) {
+  const lower = filename.toLowerCase();
+
+  if (lower.endsWith(".gpx")) {
+    return parseRouteGpx(raw, averageSpeedKmh);
+  }
+
+  return parseRouteGeoJson(raw, averageSpeedKmh);
 }
