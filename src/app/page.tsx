@@ -1,15 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { MapPanel } from "@/components/map-panel";
 import { parseRouteFile } from "@/lib/geojson";
 import type { RouteSegment } from "@/types/route-segment";
 import type { WeatherPointForecast } from "@/types/weather-point-forecast";
 
-const DEMO_ROUTES = [
-  { label: "AA 194", file: "AA_194_z_noclegami__Copy_.gpx" },
-  { label: "Slovenia", file: "Slovenia__Copy_.gpx" },
-] as const;
+const DEMO_ROUTES: { label: string; file: string }[] = [];
 
 type ThemeMode = "dark" | "light";
 
@@ -49,8 +46,6 @@ export default function Home() {
   const [forecastError, setForecastError] = useState<string | null>(null);
   const [forecastRows, setForecastRows] = useState<WeatherPointForecast[]>([]);
   const [themeMode, setThemeMode] = useState<ThemeMode>("dark");
-  const tableRef = useRef<HTMLDivElement>(null);
-  const tablePosRef = useRef({ x: 16, y: 200 });
 
   useEffect(() => {
     const saved = window.localStorage.getItem("theme-mode");
@@ -73,24 +68,6 @@ export default function Home() {
       window.localStorage.setItem("theme-mode", next);
       return next;
     });
-  }
-
-  function startDrag(e: React.MouseEvent) {
-    const offsetX = e.clientX - tablePosRef.current.x;
-    const offsetY = e.clientY - tablePosRef.current.y;
-    function onMove(ev: MouseEvent) {
-      tablePosRef.current = { x: ev.clientX - offsetX, y: ev.clientY - offsetY };
-      if (tableRef.current) {
-        tableRef.current.style.left = `${tablePosRef.current.x}px`;
-        tableRef.current.style.top = `${tablePosRef.current.y}px`;
-      }
-    }
-    function onUp() {
-      document.removeEventListener("mousemove", onMove);
-      document.removeEventListener("mouseup", onUp);
-    }
-    document.addEventListener("mousemove", onMove);
-    document.addEventListener("mouseup", onUp);
   }
 
   async function parseAndSetRoute(raw: string, filename: string) {
@@ -304,51 +281,44 @@ export default function Home() {
             {routeError ? <div className={`md:col-span-2 rounded-lg border px-3 py-2 text-xs ${isDark ? "border-rose-400/40 bg-rose-400/10 text-rose-200" : "border-rose-300 bg-rose-50 text-rose-700"}`}>{routeError}</div> : null}
             {weatherTestResult ? <div className={`md:col-span-2 rounded-lg border px-3 py-2 text-xs ${isDark ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-200" : "border-emerald-300 bg-emerald-50 text-emerald-800"}`}>{weatherTestResult}</div> : null}
             {forecastError ? <div className={`md:col-span-2 rounded-lg border px-3 py-2 text-xs ${isDark ? "border-rose-400/40 bg-rose-400/10 text-rose-200" : "border-rose-300 bg-rose-50 text-rose-700"}`}>{forecastError}</div> : null}
+
+            {(forecastRows.length > 0 || forecastLoading) ? (
+              <div className={`md:col-span-2 rounded-lg border ${isDark ? "border-slate-700" : "border-slate-300"}`}>
+                <div className={`px-2 py-1.5 text-xs font-semibold ${isDark ? "bg-slate-800/80 text-slate-200" : "bg-slate-200 text-slate-800"}`}>
+                  Prognoza pogody na trasie
+                  {forecastLoading && <span className="ml-2 font-normal opacity-60">liczę...</span>}
+                </div>
+                <div className="overflow-y-auto" style={{ maxHeight: 220 }}>
+                  <table className="min-w-full text-xs">
+                    <thead className={`sticky top-0 ${isDark ? "bg-slate-800 text-slate-200" : "bg-slate-100 text-slate-800"}`}>
+                      <tr>
+                        <th className="px-2 py-2 text-left whitespace-nowrap">Segment</th>
+                        <th className="px-2 py-2 text-left whitespace-nowrap">Plan startu</th>
+                        <th className="px-2 py-2 text-left whitespace-nowrap">Temp (°C)</th>
+                        <th className="px-2 py-2 text-left whitespace-nowrap">Opad %</th>
+                        <th className="px-2 py-2 text-left whitespace-nowrap">Deszcz mm</th>
+                        <th className="px-2 py-2 text-left whitespace-nowrap">Wiatr km/h</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {forecastRows.map((row) => (
+                        <tr key={row.segmentId + row.etaMinutes} className={isDark ? "border-t border-slate-700" : "border-t border-slate-300"}>
+                          <td className="px-2 py-1.5">{row.segmentId}</td>
+                          <td className="px-2 py-1.5 whitespace-nowrap">{row.plannedAtRouteTz}</td>
+                          <td className="px-2 py-1.5">{row.temperatureC ?? "-"}</td>
+                          <td className="px-2 py-1.5">{row.precipitationProbability ?? "-"}</td>
+                          <td className="px-2 py-1.5">{row.rainMm ?? row.precipitationMm ?? "-"}</td>
+                          <td className="px-2 py-1.5">{row.windKmh ?? "-"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : null}
           </div>
         </details>
       </header>
-
-      {(forecastRows.length > 0 || forecastLoading) ? (
-        <div
-          ref={tableRef}
-          style={{ position: "absolute", left: tablePosRef.current.x, top: tablePosRef.current.y, zIndex: 1100 }}
-          className={`rounded-xl border shadow-2xl backdrop-blur select-none ${isDark ? "border-slate-700/80 bg-slate-950/92 text-slate-100" : "border-slate-300/90 bg-white/92 text-slate-900"}`}
-        >
-          <div
-            onMouseDown={startDrag}
-            className={`flex cursor-grab items-center justify-between gap-4 px-3 py-2 text-xs font-semibold rounded-t-xl ${isDark ? "bg-slate-800/80" : "bg-slate-100"}`}
-          >
-            <span>Prognoza pogody na trasie</span>
-            {forecastLoading && <span className="opacity-60">aktualizuje...</span>}
-          </div>
-          <div className="max-h-64 overflow-auto">
-            <table className="min-w-full text-xs">
-              <thead className={`sticky top-0 ${isDark ? "bg-slate-800/90 text-slate-200" : "bg-slate-200 text-slate-800"}`}>
-                <tr>
-                  <th className="px-2 py-2 text-left whitespace-nowrap">Segment</th>
-                  <th className="px-2 py-2 text-left whitespace-nowrap">Plan startu</th>
-                  <th className="px-2 py-2 text-left whitespace-nowrap">Temp (°C)</th>
-                  <th className="px-2 py-2 text-left whitespace-nowrap">Opad %</th>
-                  <th className="px-2 py-2 text-left whitespace-nowrap">Deszcz mm</th>
-                  <th className="px-2 py-2 text-left whitespace-nowrap">Wiatr km/h</th>
-                </tr>
-              </thead>
-              <tbody>
-                {forecastRows.map((row) => (
-                  <tr key={row.segmentId + row.etaMinutes} className={isDark ? "border-t border-slate-700" : "border-t border-slate-300"}>
-                    <td className="px-2 py-1.5">{row.segmentId}</td>
-                    <td className="px-2 py-1.5 whitespace-nowrap">{row.plannedAtRouteTz}</td>
-                    <td className="px-2 py-1.5">{row.temperatureC ?? "-"}</td>
-                    <td className="px-2 py-1.5">{row.precipitationProbability ?? "-"}</td>
-                    <td className="px-2 py-1.5">{row.rainMm ?? row.precipitationMm ?? "-"}</td>
-                    <td className="px-2 py-1.5">{row.windKmh ?? "-"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }

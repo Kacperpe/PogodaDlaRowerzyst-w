@@ -26,10 +26,26 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  if (lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+    return NextResponse.json(
+      { ok: false, error: "lat/lon out of range." },
+      { status: 400 },
+    );
+  }
+
   const target = new Date(timeIso);
   if (Number.isNaN(target.getTime())) {
     return NextResponse.json(
       { ok: false, error: "Invalid time format. Expected ISO datetime." },
+      { status: 400 },
+    );
+  }
+
+  // Open-Meteo supports max 16-day forecast
+  const nowMs = Date.now();
+  if (target.getTime() > nowMs + 16 * 24 * 60 * 60 * 1000 || target.getTime() < nowMs - 24 * 60 * 60 * 1000) {
+    return NextResponse.json(
+      { ok: false, error: "Time out of forecast range (max 16 days ahead)." },
       { status: 400 },
     );
   }

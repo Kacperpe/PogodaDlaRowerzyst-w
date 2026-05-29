@@ -12,7 +12,7 @@ export async function login(formData: FormData) {
   });
 
   if (error) {
-    redirect("/login?error=" + encodeURIComponent(error.message));
+    redirect("/login?error=" + encodeURIComponent("Nieprawidlowy email lub haslo."));
   }
 
   redirect("/");
@@ -27,7 +27,7 @@ export async function register(formData: FormData) {
   });
 
   if (error) {
-    redirect("/register?error=" + encodeURIComponent(error.message));
+    redirect("/register?error=" + encodeURIComponent("Rejestracja nie powiodla sie. Sprawdz dane i sprobuj ponownie."));
   }
 
   redirect("/login?message=Sprawdź email, aby potwierdzić konto.");

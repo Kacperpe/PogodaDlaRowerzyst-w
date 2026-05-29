@@ -7,9 +7,17 @@ const OVERPASS_URLS = [
   "https://overpass.private.coffee/api/interpreter",
 ];
 
-// in-memory server-side cache, TTL 1h
+// in-memory server-side cache, TTL 1h, max 100 entries (FIFO eviction)
 const poiCache = new Map<string, { pois: Poi[]; ts: number }>();
 const CACHE_TTL = 60 * 60 * 1000;
+const CACHE_MAX = 100;
+
+function cacheSet(key: string, value: { pois: Poi[]; ts: number }) {
+  if (poiCache.size >= CACHE_MAX) {
+    poiCache.delete(poiCache.keys().next().value!);
+  }
+  poiCache.set(key, value);
+}
 
 type OverpassElement = {
   type: string;
@@ -110,6 +118,25 @@ export async function GET(request: NextRequest) {
     return Response.json({ ok: false, error: "Brak parametrow bbox" }, { status: 400 });
   }
 
+  const minLatN = parseFloat(minLat);
+  const minLonN = parseFloat(minLon);
+  const maxLatN = parseFloat(maxLat);
+  const maxLonN = parseFloat(maxLon);
+
+  if (
+    !Number.isFinite(minLatN) || !Number.isFinite(minLonN) ||
+    !Number.isFinite(maxLatN) || !Number.isFinite(maxLonN) ||
+    minLatN < -90 || maxLatN > 90 || minLonN < -180 || maxLonN > 180 ||
+    minLatN >= maxLatN || minLonN >= maxLonN
+  ) {
+    return Response.json({ ok: false, error: "Nieprawidlowe wspolrzedne bbox" }, { status: 400 });
+  }
+
+  // Limit max query area to ~500x500 km to prevent abuse
+  if ((maxLatN - minLatN) > 5 || (maxLonN - minLonN) > 5) {
+    return Response.json({ ok: false, error: "Obszar bbox zbyt duzy (max 5 stopni)" }, { status: 400 });
+  }
+
   const cacheKey = roundBbox(minLat, minLon, maxLat, maxLon);
   const cached = poiCache.get(cacheKey);
   if (cached && Date.now() - cached.ts < CACHE_TTL) {
@@ -132,7 +159,7 @@ export async function GET(request: NextRequest) {
       pois.push({ id: el.id, lat: el.lat, lon: el.lon, category, name: el.tags.name });
     }
 
-    poiCache.set(cacheKey, { pois, ts: Date.now() });
+    cacheSet(cacheKey, { pois, ts: Date.now() });
 
     return Response.json({ ok: true, pois }, {
       headers: { "Cache-Control": "public, max-age=3600" },
