@@ -22,12 +22,14 @@ function buildEvent({
   summary,
   description,
   alarmMinutes,
+  notifyEmail,
 }: {
   dtstart: Date;
   dtend: Date;
   summary: string;
   description: string;
   alarmMinutes?: number;
+  notifyEmail?: string;
 }): string {
   const lines = [
     "BEGIN:VEVENT",
@@ -45,6 +47,17 @@ function buildEvent({
       `DESCRIPTION:${esc(summary)}`,
       "END:VALARM",
     );
+    if (notifyEmail) {
+      lines.push(
+        "BEGIN:VALARM",
+        "ACTION:EMAIL",
+        `TRIGGER:-PT${alarmMinutes}M`,
+        `SUMMARY:${esc(summary)}`,
+        `DESCRIPTION:${esc(description)}`,
+        `ATTENDEE:mailto:${notifyEmail}`,
+        "END:VALARM",
+      );
+    }
   }
   lines.push("END:VEVENT");
   return lines.join("\r\n");
@@ -53,9 +66,6 @@ function buildEvent({
 type AlertKind = "rain" | "wind" | "snow";
 
 type Alert = WeatherPointForecast & { kind: AlertKind };
-
-const WEATHER_CODE_SNOW = new Set([71, 73, 75, 77, 85, 86]);
-const WEATHER_CODE_STORM = new Set([95, 96, 99]);
 
 function detectAlerts(rows: WeatherPointForecast[]): Alert[] {
   const alerts: Alert[] = [];
@@ -83,6 +93,7 @@ function alertLabel(kind: AlertKind): string {
 export function generateRouteIcs(
   forecastRows: WeatherPointForecast[],
   routeStartAt: string,
+  notifyEmail?: string,
 ): string {
   const routeStart = new Date(routeStartAt);
   const lastRow = forecastRows[forecastRows.length - 1];
@@ -92,7 +103,6 @@ export function generateRouteIcs(
 
   const alerts = detectAlerts(forecastRows);
 
-  // Build summary description for start event
   let summaryDesc: string;
   if (alerts.length === 0) {
     summaryDesc = "Brak alertow pogodowych — dobra pogoda na trasie!";
@@ -111,16 +121,17 @@ export function generateRouteIcs(
 
   const events: string[] = [];
 
-  // 1. Route start summary event — reminder at route start
+  // Route summary — reminder 60 min before start so you know before leaving
   events.push(buildEvent({
     dtstart: routeStart,
     dtend: routeEnd,
     summary: "Trasa rowerowa — prognoza pogody",
     description: summaryDesc,
-    alarmMinutes: 0,
+    alarmMinutes: 60,
+    notifyEmail,
   }));
 
-  // 2. Individual alert events with 30-min-before reminders
+  // Individual alert events with 30-min reminders
   for (const alert of alerts) {
     const alertTime = new Date(routeStart.getTime() + alert.etaMinutes * 60_000);
     const alertEnd = new Date(alertTime.getTime() + 15 * 60_000);
@@ -138,6 +149,7 @@ export function generateRouteIcs(
       summary: `${emoji} ${label} na trasie — ${alert.plannedAtRouteTz}`,
       description: detail,
       alarmMinutes: 30,
+      notifyEmail,
     }));
   }
 

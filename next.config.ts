@@ -25,6 +25,10 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  experimental: {
+    // Avoid Turbopack's SQLite-backed dev cache in OneDrive\.STARTUP paths.
+    turbopackFileSystemCacheForDev: false,
+  },
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
   },

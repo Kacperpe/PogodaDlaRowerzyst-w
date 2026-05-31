@@ -3,10 +3,12 @@ import { NextRequest, NextResponse } from "next/server";
 type HourlyWeather = {
   time: string[];
   temperature_2m?: number[];
+  apparent_temperature?: number[];
   precipitation_probability?: number[];
   precipitation?: number[];
   rain?: number[];
   wind_speed_10m?: number[];
+  wind_gusts_10m?: number[];
   weather_code?: number[];
 };
 
@@ -59,8 +61,8 @@ export async function GET(request: NextRequest) {
 
   const url =
     `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
-    "&hourly=temperature_2m,precipitation_probability,precipitation,rain,wind_speed_10m,weather_code" +
-    `&start_date=${startDate}&end_date=${endDate}&timezone=auto`;
+    "&hourly=temperature_2m,apparent_temperature,precipitation_probability,precipitation,rain,wind_speed_10m,wind_gusts_10m,weather_code" +
+    `&start_date=${startDate}&end_date=${endDate}&timezone=auto&models=best_match`;
 
   try {
     const response = await fetch(url, { cache: "no-store" });
@@ -104,10 +106,12 @@ export async function GET(request: NextRequest) {
       sample: {
         at: hourly.time[bestIndex],
         temperatureC: hourly.temperature_2m?.[bestIndex] ?? null,
+        apparentTemperatureC: hourly.apparent_temperature?.[bestIndex] ?? null,
         precipitationProbability: hourly.precipitation_probability?.[bestIndex] ?? null,
         precipitationMm: hourly.precipitation?.[bestIndex] ?? null,
         rainMm: hourly.rain?.[bestIndex] ?? null,
         windKmh: hourly.wind_speed_10m?.[bestIndex] ?? null,
+        windGustsKmh: hourly.wind_gusts_10m?.[bestIndex] ?? null,
         weatherCode: hourly.weather_code?.[bestIndex] ?? null,
       },
     });

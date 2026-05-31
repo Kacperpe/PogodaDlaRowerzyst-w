@@ -3,7 +3,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
-export async function login(formData: FormData) {
+export async function login(
+  _prevState: string | null,
+  formData: FormData,
+): Promise<string | null> {
   const supabase = await createClient();
 
   const { error } = await supabase.auth.signInWithPassword({
@@ -12,13 +15,16 @@ export async function login(formData: FormData) {
   });
 
   if (error) {
-    redirect("/login?error=" + encodeURIComponent("Nieprawidlowy email lub haslo."));
+    return "Nieprawidłowy email lub hasło.";
   }
 
   redirect("/");
 }
 
-export async function register(formData: FormData) {
+export async function register(
+  _prevState: string | null,
+  formData: FormData,
+): Promise<string | null> {
   const supabase = await createClient();
 
   const { error } = await supabase.auth.signUp({
@@ -27,10 +33,10 @@ export async function register(formData: FormData) {
   });
 
   if (error) {
-    redirect("/register?error=" + encodeURIComponent("Rejestracja nie powiodla sie. Sprawdz dane i sprobuj ponownie."));
+    return "Rejestracja nie powiodła się. Sprawdź dane i spróbuj ponownie.";
   }
 
-  redirect("/login?message=Sprawdź email, aby potwierdzić konto.");
+  redirect("/login?message=" + encodeURIComponent("Sprawdź email, aby potwierdzić konto."));
 }
 
 export async function logout() {

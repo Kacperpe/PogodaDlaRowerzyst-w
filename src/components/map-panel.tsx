@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
 import type { RouteSegment } from "@/types/route-segment";
-import type { WeatherPointForecast } from "@/types/weather-point-forecast";
+import type { WeatherAlert } from "@/types/weather-alert";
 import type { Poi, PoiCategory } from "@/types/poi";
 import { POI_CONFIG } from "@/types/poi";
 
@@ -17,7 +17,7 @@ type ThemeMode = "dark" | "light";
 type MapPanelProps = {
   segments: RouteSegment[];
   themeMode: ThemeMode;
-  forecastRows: WeatherPointForecast[];
+  weatherAlerts: WeatherAlert[];
 };
 
 type LatLng = [number, number];
@@ -53,7 +53,7 @@ function isNearRoute(poi: Poi, segments: RouteSegment[]): boolean {
   return false;
 }
 
-export function MapPanel({ segments, themeMode, forecastRows }: MapPanelProps) {
+export function MapPanel({ segments, themeMode, weatherAlerts }: MapPanelProps) {
   const routePoints = useMemo<LatLng[]>(() => {
     if (segments.length === 0) return [];
     const points: LatLng[] = [[segments[0].from[1], segments[0].from[0]]];
@@ -86,13 +86,8 @@ export function MapPanel({ segments, themeMode, forecastRows }: MapPanelProps) {
   }, [segments]);
 
   useEffect(() => {
-    if (!bbox) {
-      setPois([]);
-      return;
-    }
+    if (!bbox) return;
     const controller = new AbortController();
-    setPoisLoading(true);
-    setPoisError(null);
     const params = new URLSearchParams({
       minLat: String(bbox.minLat),
       minLon: String(bbox.minLon),
@@ -100,6 +95,8 @@ export function MapPanel({ segments, themeMode, forecastRows }: MapPanelProps) {
       maxLon: String(bbox.maxLon),
     });
     const timer = setTimeout(() => {
+      setPoisLoading(true);
+      setPoisError(null);
       fetch(`/api/pois?${params.toString()}`, { signal: controller.signal })
         .then(async (res) => {
           const data = (await res.json()) as { ok: boolean; pois?: Poi[]; error?: string };
@@ -133,17 +130,6 @@ export function MapPanel({ segments, themeMode, forecastRows }: MapPanelProps) {
 
   const isDark = themeMode === "dark";
 
-  const rainAlerts = useMemo(
-    () =>
-      forecastRows.filter(
-        (row) =>
-          (row.rainMm ?? 0) > 0 ||
-          (row.precipitationMm ?? 0) > 0 ||
-          (row.precipitationProbability ?? 0) >= 40,
-      ),
-    [forecastRows],
-  );
-
   function toggleCategory(cat: PoiCategory) {
     setActiveCategories((prev) => {
       const next = new Set(prev);
@@ -159,7 +145,7 @@ export function MapPanel({ segments, themeMode, forecastRows }: MapPanelProps) {
 
   return (
     <section className={`absolute inset-0 transition-colors duration-300 ${isDark ? "bg-slate-950" : "bg-slate-100"}`}>
-      <RouteMap points={routePoints} themeMode={themeMode} rainAlerts={rainAlerts} pois={filteredPois} />
+      <RouteMap points={routePoints} themeMode={themeMode} weatherAlerts={weatherAlerts} pois={filteredPois} />
 
       {segments.length === 0 ? (
         <div className="pointer-events-none absolute inset-x-0 top-28 z-[500] flex justify-center px-4">
@@ -170,7 +156,7 @@ export function MapPanel({ segments, themeMode, forecastRows }: MapPanelProps) {
       ) : null}
 
       {segments.length > 0 ? (
-        <div className={`absolute bottom-6 left-3 z-[1000] rounded-xl border shadow-xl backdrop-blur ${panelBase}`}>
+        <div className={`absolute bottom-20 left-3 z-[1000] rounded-xl border shadow-xl backdrop-blur md:bottom-6 ${panelBase}`}>
           <button
             type="button"
             onClick={() => setPanelOpen((o) => !o)}
@@ -209,6 +195,7 @@ export function MapPanel({ segments, themeMode, forecastRows }: MapPanelProps) {
                   );
                 })}
               </div>
+
             </>
           ) : null}
         </div>
